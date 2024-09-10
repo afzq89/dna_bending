@@ -1,0 +1,8 @@
+-O -rem 0 -i abmd.in.1 -c pre.ncrst.1 -o abmd.out.1 -p prmtop -x abmd.nc.1 -r abmd.ncrst.1 -inf abmd.info.1
+-O -rem 0 -i abmd.in.2 -c pre.ncrst.2 -o abmd.out.2 -p prmtop -x abmd.nc.2 -r abmd.ncrst.2 -inf abmd.info.2
+-O -rem 0 -i abmd.in.3 -c pre.ncrst.3 -o abmd.out.3 -p prmtop -x abmd.nc.3 -r abmd.ncrst.3 -inf abmd.info.3
+-O -rem 0 -i abmd.in.4 -c pre.ncrst.4 -o abmd.out.4 -p prmtop -x abmd.nc.4 -r abmd.ncrst.4 -inf abmd.info.4
+-O -rem 0 -i abmd.in.5 -c pre.ncrst.5 -o abmd.out.5 -p prmtop -x abmd.nc.5 -r abmd.ncrst.5 -inf abmd.info.5
+-O -rem 0 -i abmd.in.6 -c pre.ncrst.6 -o abmd.out.6 -p prmtop -x abmd.nc.6 -r abmd.ncrst.6 -inf abmd.info.6
+-O -rem 0 -i abmd.in.7 -c pre.ncrst.7 -o abmd.out.7 -p prmtop -x abmd.nc.7 -r abmd.ncrst.7 -inf abmd.info.7
+-O -rem 0 -i abmd.in.8 -c pre.ncrst.8 -o abmd.out.8 -p prmtop -x abmd.nc.8 -r abmd.ncrst.8 -inf abmd.info.8

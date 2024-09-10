@@ -1,0 +1,181 @@
+#!/bin/bash
+
+# This is just a combined run for ABMD+PMD. We are using
+# 8 replica, but cvs are the same for all of them.
+
+# ABMD for 8 trajs using well-tempered algorithms in 100 ns
+# resolution = 10 deg (varies in different stages), 
+#flooding_time= 1.0, pseduo-temp=30000,  also PMD for restraints
+set -e
+rm -rf nohup.* groups 
+
+
+nstlim=50000000                              # 50ns*1
+num_atoms=1005
+w=`seq 1 8`                                  # seq of groups/states/tempratures 
+ng=8                                         # number of groups/states/tempratures
+np=8
+
+name=abmd-1D
+vis='0,1,2,3,4,5,6,7'
+
+#!==============================================================================
+for i in $w;do
+cat << EOF >> groups
+-O -rem 0 -i abmd.in.$i -c pre.ncrst.$i -o abmd.out.$i -p prmtop -x abmd.nc.$i -r abmd.ncrst.$i -inf abmd.info.$i -l log.$i
+EOF
+#!==============================================================================
+cat <<EOF > abmd.in.$i
+!===============================================================================
+!  ABMD using multiple-walker, with well-tempered in NVT -- $nstlim * 0.002 ps
+!==============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=1,                                       ! No This is a restart of an old MD
+ntx=5,                                         ! No Read velocities
+                                         
+
+!PBC                                           ! Constant volume
+ntb=1,
+ntp=0,
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=1.0,                                  ! Friction coefficient (ps^-1)
+temp0=303.15,                                  ! Target temperature -- keep it
+
+! Potential energy control
+cut=9.0,                                       ! No cutoff, in Angstroms
+
+! MD settings
+nstlim=$nstlim,                                ! $nstlim fs  total
+dt=0.002,                                      ! time step (ps)
+!nscm=2500,
+
+! SHAKE
+ntc=2,                                         ! Constrain bonds
+ntf=2,                                         ! Do not calculate forces of 
+                                               ! bonds containing hydrogen
+
+
+! Control how often information is printed
+ntpr=50000,                                     ! Print energies every 100ps
+ntwx=5000,                                      ! Print coordinates every 100ps
+ntwr=50000,                                     ! Print a restart file every 1ns
+
+ntxo=2,                                        
+ioutfm=1,                                      
+ntwprt=$num_atoms
+
+! Wrap coordinates when printing them to the same unit cell
+!iwrap=1,
+
+! Restraint options
+!ntr=1,                                        ! Positional restraints
+nmropt=1,                                     ! NMR restraints
+infe=1,                                        ! to activate the ABMD and 
+                                               ! related algorithm
+/
+&abmd
+
+  mode = 'FLOODING'
+  
+  timescale = 1.0
+  monitor_freq = 5000                         ! 100 ps, same as energy
+  snapshots_freq = 5000000
+
+  !selection_freq = 100000
+  !selection_constant = 0.00001
+  !selection_epsilon = 0.0
+  
+  wt_temperature = 15000                        ! The smaller; smoother/slower 
+                                                ! convergence
+
+
+  !monitor_file = 'abmd_monitor_.dat'
+  cv_file = 'cv.in'
+  !umbrella_file = 'bias_.nc'
+/
+&pmd
+ !output_file = 'pmd.txt'                       !default
+ output_freq = 5000                             !100 ps, same as coord
+ cv_file = 'cv-pmd.in'
+/
+
+&wt type='REST', istep1=0, istep2=$nstlim,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+DUMPAVE=restrains.log
+END
+EOF
+done
+#!===============================================================================
+for i in `seq 1 8`; do
+cat > recenter$i.in <<EOF
+parm prmtop
+trajin abmd.ncrst.$i 
+center origin :1-15
+image origin center familiar
+center origin :1-30
+image origin center familiar
+trajout recenter.ncrst.$i restart
+run
+EOF
+done
+#!===============================================================================
+# run
+# change the stage of job in the below array
+ar=(`seq 1 1`)
+for i in ${!ar[@]};do 
+cat > job${ar[$i]}.sh <<EOF
+#!/bin/tcsh
+setenv CUDA_VISIBLE_DEVICES '$vis'
+
+rm -rf ${ar[$i]}
+mkdir -p ${ar[$i]}
+cd ${ar[$i]}
+cp ../abmd.in.* ./
+cp ../*.in ./
+cp ../groups ./
+cp ../systems/prmtop ./
+cp ../systems/inpcrd.rst7 ./
+cp ../systems/RST ./
+set j = 1
+ while ( \$j <= 8 )
+   cp ../systems/abmd.ncrst.\$j ./pre.ncrst.\$j
+   @ j++
+ end
+if ( -e ../systems/nfe-abmd-umbrella-001.nc ) then
+      cp ../systems/nfe-abmd-umbrella-00*.nc ./
+      cp ../systems/nfe-abmd-wt-umbrella-00*.nc ./
+endif
+
+
+mpirun -np 8 pmemd.cuda.MPI -O -ng 8 -groupfile groups
+
+set k = 1
+ while ( \$k <= 8 )
+   cpptraj -i recenter\$k.in
+   cp recenter.ncrst.\$k ../systems/abmd.ncrst.\$k
+   rm recenter\$k.in
+   cp nfe-abmd-umbrella-00\$k.nc ../systems/ 
+   cp nfe-abmd-wt-umbrella-00\$k.nc ../systems/
+   @ k++
+ end
+cd ../
+EOF
+
+chmod +x job${ar[$i]}.sh
+./job${ar[$i]}.sh 
+done
+
+#jid1=$(bsub -n $np -q $q -gpu "num=$num:mode=shared:mps=yes" -R "select[$gpu]" -W $time -J $name -e err.%J -o out.%J < job1.sh  | awk '/is submitted/{print substr($2, 2, length($2)-2);}')
+#for i in `seq 2 4`;do
+#jid2=$(bsub -n $np -q $q -gpu "num=$num:mode=shared:mps=yes" -R "select[$gpu]" -W $time -J $name -e err.%J -o out.%J  -w "done($jid1)" < job$i.sh  | awk '/is submitted/{print substr($2, 2, length($2)-2);}')
+#jid1=$jid2
+#done
+
+#sleep 5
+#bjobs -o "jobid: job_name:20  stat: dependency:"

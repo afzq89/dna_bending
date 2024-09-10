@@ -1,0 +1,8 @@
+parm prmtop
+trajin abmd.ncrst.8 
+center origin :1-15
+image origin center familiar
+center origin :1-30
+image origin center familiar
+trajout recenter.ncrst.8 restart
+run

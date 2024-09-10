@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1 
+#SBATCH --cpus-per-task=64
+#SBATCH --time=05:59:59
+#SBATCH --partition pcon06
+#SBATCH --job-name=adna-p-b3
+#SBATCH --output=adna3.out
+#SBATCH --constraint="2a100"
+
+module purge 
+module load gcc/7.2.1
+module load cuda/11.6
+module load hpcx/openmpi-mt-2.8
+
+/bin/sudo /usr/bin/nvidia-smi -c 0
+
+ar=(`seq 8 9`)
+ar2=(`seq 0 1`)
+
+i=0
+while [ $i -lt ${#ar[*]} ]; do
+   rm -rf ${ar[$i]}
+   mkdir ${ar[$i]}
+   cd ${ar[$i]}
+   cp ./systems/cv-pmd${ar[$i]}.in ./cv-pmd.in
+   cp ./systems/cv-smd${ar[$i]}.in ./cv-smd.in
+   sed "s/GPU/${ar2[$i]}/g;s/HERE/c${ar[$i]}/g" ../README-smd-explicit-uark > README-smd-explicit-uark
+   chmod +x README-smd-explicit-uark
+   ./README-smd-explicit-uark &
+   cd ../
+   i=$(( $i + 1));
+done
+
+sleep 359m
+/bin/sudo /usr/bin/nvidia-smi -c 3

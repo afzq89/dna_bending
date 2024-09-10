@@ -1,0 +1,20 @@
+&colvar
+   cv_type = 'SPINANGLE' ! 1-5,26-30&@P
+   cv_ni = 9,
+   cv_i = 29, 62, 92, 125, 784, 817, 847, 880, 910,
+   refcrd_file = 'inpcrd.rst7',
+   axis = 0.58, 0.81, -0.09,
+   cv_min = -90.0
+   cv_max = 90.0
+   resolution = 4.0
+/
+&colvar
+   cv_type = 'SPINANGLE' ! 1-5,26-30&@P
+   cv_ni = 9,
+   cv_i = 29, 62, 92, 125, 784, 817, 847, 880, 910,
+   refcrd_file = 'inpcrd.rst7',
+   axis = -0.39, 0.37, 0.84,
+   cv_min = -90.0
+   cv_max = 90.0
+   resolution = 4.0
+/

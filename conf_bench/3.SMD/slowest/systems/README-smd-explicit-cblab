@@ -1,0 +1,85 @@
+#!/bin/bash
+# SMD simualtion for a machine with 3 GPUs 
+set -e
+rm -rf err.* out.* nohup.*
+
+nstlim=50000000                       # 100 ns
+num_atoms=1005                        # Keep the water since we need them
+export CUDA_VISIBLE_DEVICES='GPU'
+#!==============================================================================
+# CV 
+#!==============================================================================
+cat <<EOF > smd.in
+!===============================================================================
+!  SMD in NVT -- $nstlim * 0.002 ps
+!===============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=1,                                       ! This is a restart of an old MD
+ntx=5,                                         ! Read velocities
+                                         
+
+!PBC                                           ! Constant volume
+ntb=1,
+ntp=0,
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=1.0,                                  ! Friction coefficient (ps^-1)
+temp0=303.15,                                  ! Target temperature -- keep it
+
+! Potential energy control
+cut=9.0,                                       ! No cutoff, in Angstroms
+
+! MD settings
+nstlim=$nstlim,                                ! $nstlim fs  total
+dt=0.002,                                      ! time step (ps)
+!nscm=1,                                       ! Remove translation and rotation
+                                               ! every X steps
+
+! SHAKE
+ntc=2,                                         ! Constrain bonds
+ntf=2,                                         ! Do not calculate forces of 
+                                               ! bonds containing hydrogen
+
+
+! Control how often information is printed
+ntpr=5000,                                     ! Print energies every 100ps
+ntwx=5000,                                     ! Print coordinates every 100ps
+ntwr=50000,                                    ! Print a restart file every 1ns,
+!ntwv=-1
+
+ntxo=2,                                        
+ioutfm=1,                                      
+ntwprt=$num_atoms
+
+! Wrap coordinates when printing them to the same unit cell
+!iwrap=1,
+
+
+! Restraint options
+!ntr=1,                                        ! Positional restraints
+nmropt=1,                                      ! NMR restraints
+infe=1,                                        ! to activate the ABMD and 
+                                               ! related algorithm
+/
+&smd
+ output_file = 'smd.txt'
+ output_freq = 5000                            ! 100ps
+ cv_file = 'cv-inpcrd.in'
+/
+
+&wt type='REST', istep1=0, istep2=$nstlim,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+DUMPAVE=restrains.log
+END
+EOF
+#!===============================================================================
+#run
+cp systems/RST ./
+cp systems/HERE.rst ./ 
+pmemd.cuda -O -i smd.in -o smd.out -p systems/prmtop -c systems/HERE.rst \
+              -r smd.ncrst -inf smd.info -x smd.nc &> run.log &

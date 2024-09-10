@@ -1,0 +1,397 @@
+#!/bin/bash
+# equlibrate system in 20 steps ( min(2), heat-up(4), nvt(8), npt(5+1))
+# tot: 1+9 ns 
+set -e
+rm -rf nohup.out
+export CUDA_VISIBLE_DEVICES=2
+
+nstlim0=50000    # nvt: heat up: 50*4 ps, 
+nstlim1=25000    # keep it: 25*8 ps
+nstlim2=50000    # npt: 100*6 ps
+nstlim3=4500000  # npt: 9ns w 1kcal/mol restrains
+name=ol15
+resdna=60
+resion=278
+
+cp ../0-build/prmtop ./
+cp ../0-build/inpcrd ./
+cp ../0-build/RST    ./
+
+cat <<EOF > step.0.min.in
+!===============================================================================
+! Min_1 in explicit solvent -- Hold DNA fixed which means only ions can move! 
+!===============================================================================
+&cntrl
+
+! Minimization options
+imin=1,                                        ! Turn on minimization
+maxcyc=1000,                                   ! Maximum number of minimization
+ncyc=500,                                      ! 500 steepest-descent steps, 
+                                               ! followed by 500 steps 
+					       ! (MAXCYC - NCYC) steps of
+                                               ! conjugate gradiant minimization
+
+! Periodic boundaries                          ! Constant volume
+ntb=1,
+
+! Restraint options
+ntr=1,                                         ! Positional restraints
+
+! Potential energy function options
+cut=9.0,                                       ! Nonbonded cutoff, in Angstroms
+					       ! between 8-10 (box side > 2*cut) 
+/
+Hold the DNA fixed
+500.0                                          ! kcal per mol per angstrom**2
+RES 1 $resdna
+END
+END
+EOF
+cat <<EOF > step.1.min.in
+!===============================================================================
+! Min_2 in explicit solvent -- Minimizing the entire system w/o restrain
+!===============================================================================
+
+&cntrl
+
+! Minimization options
+imin=1,                                        ! Turn on minimization
+maxcyc=1000,                                  
+ncyc=500,                                    
+
+! Periodic boundaries
+ntb=1,
+
+! Restraint options
+!ntr=1,                                        ! No positional restraints 
+nmropt=1,                                      ! NMR restraints, restraints are
+                                               ! read form DISANG file
+
+! Potential energy function options
+cut=9.0,              
+
+/
+&wt type='REST', istep1=0, istep2=10000,value1=1.0,value2=1.0 /
+&wt type='END'/
+DISANG=RST
+
+EOF
+array=(2 3 4 5)
+array1=(0 75 150 225)
+array2=(0 1 1 1)
+array3=(1 5 5 5)
+i=0
+while [ $i -lt ${#array[*]} ]; do
+cat <<EOF > step.${array[$i]}.heat.in
+!===============================================================================
+! Heat-up${array[$i]} system  -- NVT in $nstlim0 time 
+!===============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=${array2[$i]},                           
+ntx=${array3[$i]},                          
+
+!Periodic boundaries 
+ntb=1,
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=5.0,                                  ! Friction coefficient (ps^-1)
+
+! Potential energy control
+cut=9.0,                              
+
+! MD settings
+nstlim=$nstlim0,  			       ! $nstlim0 ps total
+dt=0.001,      				       ! time step (ps)
+
+! SHAKE
+ntc=2,                  	               ! Constrain bonds containing 
+                                               ! hydrogen
+ntf=2,       				       ! Do not calculate forces of 
+                                               ! bonds containing hydrogen
+
+! Control how often information is printed
+ntpr=10000,     			       ! Print energies every 1000 steps
+ntwx=10000,     			       ! Print coordinates every 1000 
+ntwr=10000,                                    ! Print a restart file every 10K
+ntxo=2,                                        ! Write NetCDF format
+ioutfm=1,                                      ! Write NetCDF format 
+
+! Wrap coordinates when printing them to the same unit cell
+iwrap=1,
+
+! Restraint options
+ntr=1,         				       ! Positional restraints
+nmropt=1,                                      ! NMR restraints
+
+
+! Increase the temp in 5 level; tempi=${array1[$i]} and target temp temp0=$((${array1[$i]}+75))
+/
+&wt type='TEMP0', istep1=0,    istep2=10000, value1=${array1[$i]}, value2=$((${array1[$i]}+15)) /
+&wt type='TEMP0', istep1=10001, istep2=20000, value1=$((${array1[$i]}+15)), value2=$((${array1[$i]}+30)) /
+&wt type='TEMP0', istep1=20001, istep2=30000, value1=$((${array1[$i]}+30)), value2=$((${array1[$i]}+45)) /
+&wt type='TEMP0', istep1=30001, istep2=40000, value1=$((${array1[$i]}+45)), value2=$((${array1[$i]}+60)) /
+&wt type='TEMP0', istep1=40001, istep2=$nstlim0, value1=$((${array1[$i]}+60)), value2=$((${array1[$i]}+75)) /
+
+/
+&wt type='REST', istep1=0, istep2=$nstlim0,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+
+
+GROUP
+100.0
+RES 1 $resion
+END
+END
+EOF
+
+i=$(( $i + 1));
+done
+
+array=(6 7 8 9 10 11 12 13)
+array1=(75 75 50 50 25 25 12 12)
+
+i=0
+while [ $i -lt ${#array[*]} ]; do
+cat <<EOF > step.${array[$i]}.heat.in
+!===============================================================================
+! Keet temp in NVT system in $nstlim1 time 
+!===============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=1,                                       ! This IS a restart of an old MD
+ntx=5,                                         ! Read velocities
+
+! PBC
+ntb=1,
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=1.0,                                  ! Friction coefficient (ps^-1)
+temp0=303.15,                                  ! Target temperature -- keep it
+
+! Potential energy control
+cut=9.0,  
+
+! MD settings
+nstlim=$nstlim1,                               ! $nstlim1 ps total
+dt=0.001,                                      ! time step (ps)
+
+! SHAKE
+ntc=2,                                         ! Constrain bonds
+ntf=2,                                         ! Do not calculate forces of 
+                                               ! bonds containing hydrogen
+! Control how often information is printed
+ntpr=5000,                                     
+ntwx=5000,                                    
+ntwr=5000,                                   
+ntxo=2,                                        
+ioutfm=1,                                      
+
+! Wrap coordinates when printing them to the same unit cell
+iwrap=1,
+
+! Restraint options
+ntr=1,                                         ! Positional restraints
+nmropt=1,                                      ! NMR restraints
+
+/
+&wt type='REST', istep1=0, istep2=$nstlim1,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+
+GROUP
+${array1[$i]}
+RES 1 $resion
+END
+END
+EOF
+
+i=$(( $i + 1));
+done
+
+array=(14 15 16 17 18) 
+array1=(6 3 1.5 0.75 0.25)
+i=0 
+while [ $i -lt ${#array[*]} ]; do
+cat <<EOF > step.${array[$i]}.equ.in
+!===============================================================================
+! Equlibrium/Relax -- reduce restarint in NPT system in $nstlim2 time 
+!===============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=1,                                       ! This IS a restart of an old MD
+ntx=5,                                         ! Read c, v, box, and time (starts from previous step)
+
+! PBC                                          ! NPT
+ntb=2, pres0=1.0,                              ! Target externall pressure of 1 atm (pres0)
+ntp=1,                                         ! Use isotropic to maintain the pressure
+                                               ! 1=isotropic, 2=anisotropic, 3=semi-isotropic w/ surften
+taup=2,                                        ! with a relaxation time of 2 ps
+!barostat=2,                                   ! MC barostat... change to 1 for Berendsen
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=1.0,                                  ! Friction coefficient (ps^-1)
+temp0=303.15,                                  ! Target temperature -- keep it
+
+! Potential energy control
+cut=9.0,  
+
+! MD settings
+nstlim=$nstlim2,                               ! $nstlim2 ps total
+dt=0.002,                                      ! time step (ps)
+
+! SHAKE
+ntc=2,                                         ! Constrain bonds
+ntf=2,                                         ! Do not calculate forces of 
+                                               ! bonds containing hydrogen
+
+
+! Control how often information is printed
+ntpr=10000,                                     
+ntwx=10000,                                    
+ntwr=10000,                                   
+ntxo=2,                                        
+ioutfm=1,                                      
+
+! Wrap coordinates when printing them to the same unit cell
+iwrap=1,
+
+! Restraint options
+ntr=1,                                         ! Positional restraints
+nmropt=1,                                      ! NMR restraints
+
+/
+&wt type='REST', istep1=0, istep2=$nstlim2,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+
+GROUP
+${array1[$i]}
+RES 1 $resion
+END
+END
+EOF
+
+i=$(( $i + 1));
+done
+
+cat <<EOF > step.19.equ.in
+!===============================================================================
+! Equlibrium/Relax -- reduce restarint in NPT system in $nstlim3 time
+!===============================================================================
+
+&cntrl
+
+imin=0,                                        ! No minimization
+irest=1,                                       ! This IS a restart of an old MD
+ntx=5,                                         ! Read c, v, box, and time (starts from previous step)
+
+! PBC                                          ! NPT
+ntb=2, pres0=1.0,                              ! Target externall pressure of 1 atm (pres0)
+ntp=1,                                         ! Use isotropic to maintain the pressure
+                                               ! 1=isotropic, 2=anisotropic, 3=semi-isotropic w/ surften
+taup=2,                                        ! with a relaxation time of 2 ps
+!barostat=2,                                   ! MC barostat... change to 1 for Berendsen
+
+! Temperature control
+ntt=3,                                         ! Langevin dynamics
+gamma_ln=1.0,                                  ! Friction coefficient (ps^-1)
+temp0=303.15,                                  ! Target temperature -- keep it
+
+! Potential energy control
+cut=9.0,
+
+! MD settings
+nstlim=$nstlim3,                               ! $nstlim3 ps total
+dt=0.002,                                      ! time step (ps)
+
+! SHAKE
+ntc=2,                                         ! Constrain bonds
+ntf=2,                                         ! Do not calculate forces of
+                                               ! bonds containing hydrogen
+
+
+! Control how often information is printed
+ntpr=10000,
+ntwx=10000,
+ntwr=10000,
+ntxo=2,
+ioutfm=1,
+
+! Wrap coordinates when printing them to the same unit cell
+iwrap=1,
+
+
+! Restraint options
+ntr=1,                                         ! Positional restraints
+nmropt=1,
+
+/
+&wt type='REST', istep1=0, istep2=$nstlim2,value1=1.0,value2=1.0 /
+&wt type='END' /
+DISANG=RST
+
+GROUP
+0.0
+RES 1 $resion
+END
+END
+EOF
+
+#!===============================================================================
+# Prepare jobs
+ar=(`seq 0 19`)
+ar1=("min" "min" $(for ((n=1; n<=12; n++)); do  echo -n "heat "  ;done) $(for ((n=1; n<=6; n++)); do  echo -n "equ "  ;done))
+ar2=("mpirun -np 16 pmemd.MPI" "mpirun -np 16 pmemd.MPI" $(for ((n=3; n<=20; n++)); do  echo -n "pmemd.cuda "  ;done))
+
+i=0
+while [ $i -lt ${#ar[*]} ]; do
+cat > job${ar[$i]}.sh <<EOF
+#!/bin/bash
+${ar2[$i]} \\
+                   -O -i step.${ar[$i]}.${ar1[$i]}.in  -p prmtop -c inpcrd -o step.${ar[$i]}.${ar1[$i]}.out \\
+                   -r step.${ar[$i]}.${ar1[$i]}.ncrst  -inf step.${ar[$i]}.${ar1[$i]}.info  -ref inpcrd \\
+                   -x step.${ar[$i]}.${ar1[$i]}.nc
+cp step.${ar[$i]}.${ar1[$i]}.ncrst inpcrd
+EOF
+
+i=$(( $i + 1));
+done
+
+# Run jobs
+for i in $(seq 0 19);do
+chmod +x job$i.sh
+done
+
+{
+./job0.sh
+./job1.sh
+./job2.sh
+./job3.sh
+./job4.sh
+./job5.sh
+./job6.sh
+./job7.sh
+./job8.sh
+./job9.sh
+./job10.sh
+./job11.sh
+./job12.sh
+./job13.sh
+./job14.sh
+./job15.sh
+./job16.sh
+./job17.sh
+./job18.sh
+./job19.sh
+} &
