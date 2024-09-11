@@ -1,0 +1,9 @@
+&colvar
+   cv_type = 'SPINANGLE' ! 1-5,24-28&@P
+   cv_ni = 9,
+   cv_i = 32, 62, 95, 128, 733, 766, 796, 829, 862, 
+   refcrd_file = 'inpcrd.rst7',
+   npath = 2, path = 0.0, 150.0, path_mode = 'LINES',
+   nharm = 1, harm = 100.0,
+   axis = AXIS3
+/

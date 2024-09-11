@@ -1,0 +1,32 @@
+&colvar
+   cv_type = 'ORIENTATION_ANGLE' ! 1-5,26-30&@P
+   cv_ni = 9,
+   cv_i = 32, 62, 92, 125, 775, 805, 835, 868, 898,
+   refcrd_file = 'inpcrd.rst7',
+   npath = 2, path = 0.0, 150.0, path_mode = 'LINES',
+   nharm = 1, harm = 100.0,
+/
+&colvar
+   cv_type = 'ORIENTATION_ANGLE' ! 11-20&@P
+   cv_ni = 9,
+   cv_i = 311, 341, 371, 404, 434, 496, 526, 556, 589,
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -180.0,0.0,0.0,180.0
+   anchor_strength = 100,100
+/
+&colvar
+   cv_type = 'MULTI_RMSD' ! 1-5,26-30&@C5'
+   cv_ni = 10, cv_nr = 30,
+   cv_i = 3, 36, 66, 96, 129, 779, 809, 839, 872, 902,
+   cv_r = COORD1
+   anchor_position = -1.0,0.0,0.0,1.0
+   anchor_strength = 50000,50000
+/
+&colvar
+   cv_type = 'MULTI_RMSD' ! 11-20&@C5'
+   cv_ni = 10, cv_nr = 30,
+   cv_i = 315, 345, 375, 408, 438, 467, 500, 530, 560, 593,
+   cv_r = COORD2
+   anchor_position = -1.0,0.0,0.0,1.0
+   anchor_strength = 50000,50000
+/

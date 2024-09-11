@@ -1,0 +1,45 @@
+&colvar
+   cv_type = 'SPINANGLE' ! 11-20&@P
+   cv_ni = 9,
+   cv_i = 311, 341, 371, 404, 434, 496, 526, 556, 589,  
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -5.0, 0.0, 0.0, 5.0 
+   anchor_strength = 100.0,100.0
+   axis = AXIS1
+/
+&colvar
+   cv_type = 'SPINANGLE' ! 1-5,26-30&@P
+   cv_ni = 9,
+   cv_i = 32, 62, 92, 125, 775, 805, 835, 868, 898,
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -5.0, 0.0, 0.0, 5.0
+   anchor_strength = 100.0,100.0
+   axis = AXIS1
+/
+&colvar
+   cv_type = 'SPINANGLE' ! 11-20&@P
+   cv_ni = 9,
+   cv_i = 311, 341, 371, 404, 434, 496, 526, 556, 589,
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -5.0, 0.0, 0.0, 5.0
+   anchor_strength = 100.0,100.0
+   axis = AXIS2
+/
+&colvar
+   cv_type = 'SPINANGLE' ! 1-5,26-30&@P
+   cv_ni = 9,
+   cv_i = 32, 62, 92, 125, 775, 805, 835, 868, 898,
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -5.0, 0.0, 0.0, 5.0
+   anchor_strength = 100.0,100.0
+   axis = AXIS2
+/
+&colvar
+   cv_type = 'SPINANGLE' ! 11-20&@P
+   cv_ni = 9,
+   cv_i = 311, 341, 371, 404, 434, 496, 526, 556, 589, 
+   refcrd_file = 'inpcrd.rst7',
+   anchor_position = -5.0, 0.0, 0.0, 5.0
+   anchor_strength = 100.0,100.0
+   axis = AXIS3
+/
